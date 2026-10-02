@@ -15,11 +15,15 @@ services:
       # 未設定なら admin / admin。変えたいときは .env に GF_SECURITY_ADMIN_PASSWORD を書く
       GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
       # Claude Code はメトリクスを delta temporality で送る。Prometheus の OTLP receiver は
-      # 既定では delta を "invalid temporality and type combination" で拒否するので、cumulative に変換して受ける
-      PROMETHEUS_EXTRA_ARGS: --enable-feature=otlp-deltatocumulative
+      # 既定では delta を "invalid temporality and type combination" で拒否するので、delta のまま保存させる。
+      # 期間内の合計は increase() ではなく sum_over_time() で出す（セッションごとに系列が分かれ、点が少ないため）
+      PROMETHEUS_EXTRA_ARGS: --enable-feature=otlp-native-delta-ingestion
     volumes:
       # 各コンポーネントは /data に書く。コンテナを作り直してもデータを残す
       - lgtm-data:/data
+      # Claude Code のダッシュボードをプロビジョニングする
+      - ./grafana/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/claude-code.yaml:ro
+      - ./grafana/dashboards:/otel-lgtm/dashboards/claude-code:ro
 
 volumes:
   lgtm-data:

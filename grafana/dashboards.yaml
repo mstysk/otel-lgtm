@@ -1,0 +1,11 @@
+# grafana/dashboards/ の JSON を Grafana に読み込ませる。
+# UI で編集しても保存できないので、変えるときは JSON を直してコンテナを再起動する。
+apiVersion: 1
+
+providers:
+  - name: "Claude Code"
+    type: file
+    allowUiUpdates: false
+    options:
+      path: /otel-lgtm/dashboards/claude-code
+      foldersFromFilesStructure: false
