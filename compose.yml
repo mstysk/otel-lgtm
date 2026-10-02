@@ -1,0 +1,22 @@
+# Claude Code などの OpenTelemetry をローカルで受ける Grafana LGTM（開発・検証用）。
+# grafana/otel-lgtm は Grafana / Loki / Prometheus / Tempo / OTel Collector を 1 コンテナにまとめたイメージ。
+services:
+  lgtm:
+    image: grafana/otel-lgtm:0.34.0
+    container_name: otel-lgtm
+    # Docker Desktop が起動していれば、PC を再起動しても自動で立ち上がる
+    restart: unless-stopped
+    ports:
+      # LAN に公開しないよう 127.0.0.1 にだけ bind する
+      - "127.0.0.1:3333:3000" # Grafana UI（3000 は Next.js 等とぶつかりやすいので 3333 に逃がす）
+      - "127.0.0.1:4317:4317" # OTLP gRPC
+      - "127.0.0.1:4318:4318" # OTLP HTTP
+    environment:
+      # 未設定なら admin / admin。変えたいときは .env に GF_SECURITY_ADMIN_PASSWORD を書く
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
+    volumes:
+      # 各コンポーネントは /data に書く。コンテナを作り直してもデータを残す
+      - lgtm-data:/data
+
+volumes:
+  lgtm-data:
