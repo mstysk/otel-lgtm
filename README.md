@@ -74,3 +74,25 @@ sum by (status_code) (count_over_time({service_name="claude-code"} | event_name=
 ```
 
 `$__range` は Grafana の時間範囲です。API で直接叩くときは `[1h]` のように書き換えます。
+
+## 見方（Grafana > Explore > Prometheus）
+
+メトリクスは `claude_code_cost_usage_USD_total` / `claude_code_token_usage_tokens_total` /
+`claude_code_active_time_seconds_total` / `claude_code_lines_of_code_count_total` などの名前で入ります。
+
+期間内の費用をモデルごとに:
+
+```promql
+sum by (model) (increase(claude_code_cost_usage_USD_total[$__range]))
+```
+
+### メトリクスが no data になるとき
+
+Claude Code はメトリクスを delta temporality で送ります。
+Prometheus の OTLP receiver は既定では delta を `invalid temporality and type combination` で拒否するため、
+`compose.yml` で `PROMETHEUS_EXTRA_ARGS=--enable-feature=otlp-deltatocumulative` を渡して cumulative に変換しています。
+この設定を外すと、ログ（Loki）は届くのにメトリクスだけが空になります。
+
+grafana/otel-lgtm は各コンポーネントのログを既定で捨てるので、送信の失敗はコンテナのログに出ません。
+調べるときは `compose.yml` の `environment` に一時的に `ENABLE_LOGS_ALL: "true"` を足して作り直すか、
+Prometheus の `otelcol_exporter_send_failed_metric_points_total` が増えていないかを見ます。
