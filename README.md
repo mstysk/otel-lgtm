@@ -45,6 +45,16 @@ docker compose down -v   # 停止してデータも消す
 
 項目の一覧は公式の [Monitoring usage](https://code.claude.com/docs/en/monitoring-usage) を参照してください。
 
+## ダッシュボード
+
+Grafana の **Dashboards > Claude Code**（<http://127.0.0.1:3333/d/claude-code/claude-code>）に、
+費用・token・ツール・コードの変更をまとめたダッシュボードがあります。上部の「リポジトリ」で絞り込めます。
+
+- 費用・token・ツール・サブエージェントは Loki のイベントから集計します。
+- 作業時間・変更行数・commit・pull request は Prometheus のメトリクスから集計します。
+- 定義は `grafana/dashboards/claude-code.json` です。プロビジョニングで読み込むので UI からは保存できません。
+  変えるときは JSON を直します（Grafana が数十秒以内に読み直します）。
+
 ## 見方（Grafana > Explore > Loki）
 
 API リクエストごとのイベントは `event_name="api_request"` で、
@@ -80,17 +90,21 @@ sum by (status_code) (count_over_time({service_name="claude-code"} | event_name=
 メトリクスは `claude_code_cost_usage_USD_total` / `claude_code_token_usage_tokens_total` /
 `claude_code_active_time_seconds_total` / `claude_code_lines_of_code_count_total` などの名前で入ります。
 
+メトリクスは delta のまま保存しているので（下記）、期間内の合計は `increase()` ではなく `sum_over_time()` で出します。
+
 期間内の費用をモデルごとに:
 
 ```promql
-sum by (model) (increase(claude_code_cost_usage_USD_total[$__range]))
+sum by (model) (sum_over_time(claude_code_cost_usage_USD_total[$__range]))
 ```
 
 ### メトリクスが no data になるとき
 
 Claude Code はメトリクスを delta temporality で送ります。
 Prometheus の OTLP receiver は既定では delta を `invalid temporality and type combination` で拒否するため、
-`compose.yml` で `PROMETHEUS_EXTRA_ARGS=--enable-feature=otlp-deltatocumulative` を渡して cumulative に変換しています。
+`compose.yml` で `PROMETHEUS_EXTRA_ARGS=--enable-feature=otlp-native-delta-ingestion` を渡して delta のまま保存しています。
+cumulative に変換する `otlp-deltatocumulative` もありますが、Claude Code のメトリクスはセッションごとに系列が分かれて点が少ないため、
+`increase()` では commit のような稀な値を取りこぼします。
 この設定を外すと、ログ（Loki）は届くのにメトリクスだけが空になります。
 
 grafana/otel-lgtm は各コンポーネントのログを既定で捨てるので、送信の失敗はコンテナのログに出ません。
